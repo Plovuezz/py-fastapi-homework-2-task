@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from database import get_db, MovieModel
 from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
-from schemas.movies import MovieCreateSchema, MovieDetailResponseSchema, MovieListItemSchema, MovieDetailSchema, \
+from schemas.movies import MovieCreateSchema, MovieListItemSchema, MovieDetailSchema, \
     MovieUpdateSchema
 
 router = APIRouter()
@@ -149,9 +149,14 @@ async def create_movie(
         languages=languages,
     )
     db.add(new_movie)
-    await db.commit()
-    await db.refresh(new_movie)
-    await db.refresh(new_movie)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A movie with the name '{movie.name}' and release date '{movie.date}' already exists."
+        )
     await db.refresh(new_movie, attribute_names=["country", "genres", "actors", "languages"])
     return new_movie
 
